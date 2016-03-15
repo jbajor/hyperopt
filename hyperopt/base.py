@@ -621,8 +621,8 @@ class Trials(object):
         # -- Stop-gap implementation!
         #    fmin should have been a Trials method in the first place
         #    but for now it's still sitting in another file.
-        import fmin as fmin_module
-        return fmin_module.fmin(
+        from fmin import fmin as fmin_function
+        return fmin_function(
             fn, space, algo, max_evals,
             trials=self,
             rstate=rstate,
@@ -631,7 +631,6 @@ class Trials(object):
             pass_expr_memo_ctrl=pass_expr_memo_ctrl,
             catch_eval_exceptions=catch_eval_exceptions,
             return_argmin=return_argmin)
-
 
 def trials_from_docs(docs, validate=True, **kwargs):
     """Construct a Trials base class instance from a list of trials documents
