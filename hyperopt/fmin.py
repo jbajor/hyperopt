@@ -1,8 +1,4 @@
-try:
-    import dill as cPickle
-except ImportError:
-    import cPickle
-
+import dill
 import functools
 import logging
 import os
@@ -47,7 +43,7 @@ class FMinIter(object):
     """Object for conducting search experiments.
     """
     catch_eval_exceptions = False
-    cPickle_protocol = -1
+    pickle_protocol = -1
 
     def __init__(self, algo, domain, trials, rstate, async=None,
             max_queue_len=1,
@@ -70,10 +66,9 @@ class FMinIter(object):
         if self.async:
             if 'FMinIter_Domain' in trials.attachments:
                 logger.warn('over-writing old domain trials attachment')
-            msg = cPickle.dumps(
-                    domain, protocol=self.cPickle_protocol)
+            msg = dill.dumps(domain, protocol=self.pickle_protocol)
             # -- sanity check for unpickling
-            cPickle.loads(msg)
+            dill.loads(msg)
             trials.attachments['FMinIter_Domain'] = msg
 
     def serial_evaluate(self, N=-1):

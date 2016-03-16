@@ -95,10 +95,7 @@ __license__ = "3-clause BSD License"
 __contact__ = "github.com/hyperopt/hyperopt"
 
 import copy
-try:
-    import dill as cPickle
-except ImportError:
-    import cPickle
+import dill
 import hashlib
 import logging
 import optparse
@@ -245,10 +242,10 @@ def connection_with_tunnel(host='localhost',
                     )
             # -- give the subprocess time to set up
             time.sleep(.5)
-            connection = pymongo.Connection('127.0.0.1', local_port,
+            connection = pymongo.MongoClient('127.0.0.1', local_port,
                     document_class=SON)
         else:
-            connection = pymongo.Connection(host, port, document_class=SON)
+            connection = pymongo.MongoClient(host, port, document_class=SON)
             if user:
                 if user == 'hyperopt':
                     authenticate_for_db(connection[auth_dbname])
@@ -257,9 +254,9 @@ def connection_with_tunnel(host='localhost',
             ssh_tunnel=None
 
         # -- Ensure that changes are written to at least once server.
-        connection.write_concern['w'] = 1
+        # connection.write_concern['w'] = 1
         # -- Ensure that changes are written to the journal if there is one.
-        connection.write_concern['j'] = True
+        # connection.write_concern['j'] = True
 
         return connection, ssh_tunnel
 
@@ -300,7 +297,7 @@ class MongoJobs(object):
         Parameters
         ----------
 
-        db - Mongo Database (e.g. `Connection()[dbname]`)
+        db - Mongo Database (e.g. `MongoClient()[dbname]`)
             database in which all job-related info is stored
 
         jobs - Mongo Collection handle
@@ -312,7 +309,7 @@ class MongoJobs(object):
             GridFS is used to store attachments - binary blobs that don't fit
             or are awkward to store in the `jobs` collection directly.
 
-        conn - Mongo Connection
+        conn - Mongo MongoClient
             Why we need to keep this, I'm not sure.
 
         tunnel - something for ssh tunneling if you're doing that
@@ -324,7 +321,7 @@ class MongoJobs(object):
         """
         self.db = db
         self.jobs = jobs
-        assert jobs.write_concern['w'] >= 1
+        # assert jobs.write_concern['w'] >= 1
         self.gfs = gfs
         self.conn = conn
         self.tunnel = tunnel
@@ -707,7 +704,7 @@ class MongoTrials(Trials):
         _trials = orig_trials[:] #copy to make sure it doesn't get screwed up
         if _trials:
             db_data = list(self.handle.jobs.find(query,
-                                            fields=['_id', 'version']))
+                                            projection=['_id', 'version']))
             # -- pull down a fresh list of ids from mongo
             if db_data:
                 #make numpy data arrays
@@ -746,9 +743,9 @@ class MongoTrials(Trials):
                                       str(numpy.random.randint(1e8)) + '.pkl')
                     logger.error('HYPEROPT REFRESH ERROR: writing error file to %s' % reportpath)
                     _file = open(reportpath, 'w')
-                    cPickle.dump({'db_data': db_data,
-                                  'existing_data': existing_data},
-                                _file)
+                    dill.dump({'db_data': db_data,
+                               'existing_data': existing_data},
+                               _file)
                     _file.close()
                     raise
 
@@ -1043,9 +1040,9 @@ class MongoWorker(object):
             cmd_protocol = cmd[0]
             try:
                 if cmd_protocol == 'cpickled fn':
-                    worker_fn = cPickle.loads(cmd[1])
+                    worker_fn = dill.loads(cmd[1])
                 elif cmd_protocol == 'call evaluate':
-                    bandit = cPickle.loads(cmd[1])
+                    bandit = dill.loads(cmd[1])
                     worker_fn = bandit.evaluate
                 elif cmd_protocol == 'token_load':
                     cmd_toks = cmd[1].split('.')
@@ -1057,14 +1054,14 @@ class MongoWorker(object):
                 elif cmd_protocol == 'driver_attachment':
                     #name = 'driver_attachment_%s' % job['exp_key']
                     blob = ctrl.trials.attachments[cmd[1]]
-                    bandit_name, bandit_args, bandit_kwargs = cPickle.loads(blob)
+                    bandit_name, bandit_args, bandit_kwargs = dill.loads(blob)
                     worker_fn = json_call(bandit_name,
                             args=bandit_args,
                             kwargs=bandit_kwargs).evaluate
                 elif cmd_protocol == 'domain_attachment':
                     blob = ctrl.trials.attachments[cmd[1]]
                     try:
-                        domain = cPickle.loads(blob)
+                        domain = dill.loads(blob)
                     except BaseException, e:
                         logger.info('Error while unpickling. Try installing dill via "pip install dill" for enhanced pickling support.')
                         raise
@@ -1300,4 +1297,3 @@ def main_worker():
         return -1
 
     return main_worker_helper(options, args)
-
